@@ -133,11 +133,12 @@ function createFolder($projectName, $BCAccountConfig, $access_token) {
   {
       echo 'error:' . curl_error($ch);
   }
-  curl_close($ch);
+
   if(isset($_GET['debug'])){
     $info = curl_getinfo($ch);
     var_dump($info);
-  }  
+  } 
+  curl_close($ch);  
 	$responseData = json_decode($response, TRUE);
   if (is_array($responseData) && array_key_exists('error_code', $responseData[0])) {
     if ($responseData[0]['error_code'] == "UNAUTHORIZED") {
