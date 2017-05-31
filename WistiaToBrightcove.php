@@ -8,7 +8,7 @@ ini_set('max_execution_time', 900); //15 minutes
 	
 // CORS enablement
 header("Access-Control-Allow-Origin: *");
-
+ 
 require_once("wistia-api/WistiaApi.class.php");
 
 if(isset($_GET['debug'])) {
@@ -20,14 +20,14 @@ $totalCount = 0;
 $allVideos = array();
 
 $BCAccountConfig =   array(
-  "Account" => "Math Solutions",
-  "ID" => 5387496875001,
-  "clientId" => "ba62dde3-3bdf-4b4b-8b25-73ec01df2c9e",
-  "clientSecret" => "f7FUw1CrD7RgkBnnh6sZCgwHucGpbB3C_L00ymAxoR-dolDCD7EYOy5kJjlfoNE_43fBmb1KLtpjJD1W8nGcgQ"
+  "Account" => "BC_ACCOUNT_NAME",
+  "ID" => BC_ACCOUNT_ID,
+  "clientId" => "BC_ACCOUNT_API_CLIENT_ID",
+  "clientSecret" => "BC_ACCOUNT_API_CLIENT_SECRET"
   );
   //read token created in wistia
 $wistiaAccountConfig = array (
-  "apiKey" => "21f10c0b501e0ebdff268ee825449314000f5f3450016cc48fa6ca530d3740af"
+  "apiKey" => "WISTIA_API_KEY"
   );
 function getAccessToken($BCAccountConfig){
 
@@ -129,43 +129,90 @@ function truncate($text, $length) {
    }
    return($text);
 }
+function sort_array_of_array(&$array, $subfield)
+{
+    $sortarray = array();
+    foreach ($array as $key => $row)
+    {
+        $sortarray[$key] = $row[$subfield];
+    }
+
+    array_multisort($sortarray, SORT_DESC, $array);
+}
+function friendlyname($string){
+    $string = str_replace(array('[\', \']'), '', $string);
+    $string = preg_replace('/\[.*\]/U', '', $string);
+    $string = preg_replace('/&(amp;)?#?[a-z0-9]+;/i', '-', $string);
+    $string = htmlentities($string, ENT_COMPAT, 'utf-8');
+    $string = preg_replace('/&([a-z])(acute|uml|circ|grave|ring|cedil|slash|tilde|caron|lig|quot|rsquo);/i', '\\1', $string );
+    $string = preg_replace(array('/[^a-z0-9]/i', '/[-]+/') , '-', $string);
+    return strtolower(trim($string, '-'));
+}
+$projectCount = 0;
 foreach($projects as $project) {
-  $videoids = array();  //all the videos in current project
-  $allFolderVideos = array();
-  $thisVideo = array(
-    'url' => '',
-    'name' => '',
-    'description' => '',
-    'folder_id' => ''
-  );  
+  $projectCount++;
+  $allFolderVideos = array(); 
   $projectId = $project->id;
   $projectName = str_replace("/", "-", $project->name);
   $projectName = str_replace('"', "'", $projectName);  
   $projectName = truncate($projectName, 100);
+  echo "<h1>" . $projectName . "</h1>";
   try {
     // use $project->name here to get bc id of folder (previously created with createFolders.php);
     // return BC folder id from BC CMS api
     $thisFolderId = getIdOfExistingFolder($projectName, $BCAccountConfig, $access_token);
-    $results = $wistiaApi->mediaList($projectId, 1, 200, true);
+    $results = $wistiaApi->mediaList($projectId, 1, 100, true);
+    echo "this project has ".count($results). " videos<br>";
+    //print_r($results);
     foreach($results as $result) {
+      $thisVideo = array(
+        'video_status' => "new",
+        'url' => '',
+        'name' => '',
+        'description' => '',
+        'folder_id' => ''
+      );       
+      $videoAssets = array();
+      $assets = array();
+      $url = "";
       //find the original source file in the assets object
-      $thisUrls = $result->assets;
-      foreach ($thisUrls as $thisUrl) {
-        if ($thisUrl->type == "OriginalFile") {
-          $url = $thisUrl->url;
+      //converts each asset to array so we can sort
+      foreach($result->assets as $asset) {
+        $assets[] = get_object_vars($asset);
+      }
+      //sort with greatest width first
+      sort_array_of_array($assets, 'width');
+
+      //filter out anything that's not a video e.g. thumbnail image
+      $videoAssets = array_filter($assets, function($v) { return strpos($v['contentType'], 'video') !== false; });
+      //exclude flv and then take largest width video
+      foreach ($videoAssets as $asset) {
+        $pos = strpos($asset['contentType'], 'flv');
+        if ($pos !== false) {
+          continue;
+        } else {
+          $url = $asset['url'];
+          break;
         }
       }
+
       $thisVideo['url'] = $url;
       $thisVideo['name'] = truncate($result->name, 100);
-      $thisVideo['description'] = truncate($result->description, 100);
+      $thisVideo['description'] = truncate(trim(strip_tags($result->description)), 100);
       $thisVideo['folder_id'] = $thisFolderId;
       $allFolderVideos[] = $thisVideo;
+
     }    
   } catch (Exception $e) {
     echo 'Caught exception: ',  $e->getMessage(), "\n";
     return;
   }
+  $friendlyProjectName = friendlyname($projectName);
+  $fp = fopen($friendlyProjectName, 'w');
+  fwrite($fp, json_encode($allFolderVideos));
+  fclose($fp);
   $allVideos[] = $allFolderVideos;
+  break;
 }
 $fp = fopen('ingest.json', 'w');
 fwrite($fp, json_encode($allVideos));

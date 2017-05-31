@@ -18,14 +18,14 @@ if(isset($_GET['debug'])) {
 }
 $totalCount = 0;
 $BCAccountConfig =   array(
-  "Account" => "Math Solutions",
-  "ID" => 5387496875001,
-  "clientId" => "ba62dde3-3bdf-4b4b-8b25-73ec01df2c9e",
-  "clientSecret" => "f7FUw1CrD7RgkBnnh6sZCgwHucGpbB3C_L00ymAxoR-dolDCD7EYOy5kJjlfoNE_43fBmb1KLtpjJD1W8nGcgQ"
+  "Account" => "BC_ACCOUNT_NAME",
+  "ID" => BC_ACCOUNT_ID,
+  "clientId" => "BC_ACCOUNT_API_CLIENT_ID",
+  "clientSecret" => "BC_ACCOUNT_API_CLIENT_SECRET"
   );
   //read token created in wistia
 $wistiaAccountConfig = array (
-  "apiKey" => "21f10c0b501e0ebdff268ee825449314000f5f3450016cc48fa6ca530d3740af"
+  "apiKey" => "WISTIA_API_KEY"
   );
 function getAccessToken($BCAccountConfig){
 	// set up request for access token
